@@ -3,7 +3,7 @@
 ## 📌 Project Overview
 This project is a **SQL-based business analysis** performed on an **Amazon-like e-commerce dataset** (mock data).  
 The goal is to **solve real-world business questions** using SQL queries and extract **valuable insights** for decision-making.
-##ER-diagram
+## ER-diagram
 <img width="1441" height="790" alt="Screenshot 2025-08-10 125722" src="https://github.com/user-attachments/assets/7766c14b-c246-45b4-9178-b093dce336c8" />
 
 
