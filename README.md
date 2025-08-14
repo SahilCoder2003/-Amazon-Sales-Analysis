@@ -3,6 +3,9 @@
 ## 📌 Project Overview
 This project is a **SQL-based business analysis** performed on an **Amazon-like e-commerce dataset** (mock data).  
 The goal is to **solve real-world business questions** using SQL queries and extract **valuable insights** for decision-making.
+##ER-diagram
+<img width="1441" height="790" alt="Screenshot 2025-08-10 125722" src="https://github.com/user-attachments/assets/7766c14b-c246-45b4-9178-b093dce336c8" />
+
 
 ## 🗂 Dataset Description
 The dataset contains multiple related tables:
@@ -74,11 +77,11 @@ LIMIT 10;
 ```
 ### 2️⃣ Revenue by Category with % Contribution (Aggregation + Subquery)
 ```sql
-       SELECT cat.category_id,
-       cat.category_name,
-       SUM(ot.total_sales) AS total_sales,
-       ROUND(SUM(ot.total_sales)::NUMERIC /
-            (SELECT SUM(total_sales) FROM order_items)::NUMERIC * 100, 2) AS per_contribution
+SELECT cat.category_id,
+cat.category_name,
+SUM(ot.total_sales) AS total_sales,
+ROUND(SUM(ot.total_sales)::NUMERIC /
+(SELECT SUM(total_sales) FROM order_items)::NUMERIC * 100, 2) AS per_contribution
 FROM category AS cat
 JOIN products AS p
   ON p.category_id = cat.category_id
@@ -90,13 +93,13 @@ ORDER BY per_contribution DESC;
 ```
 ### 3️⃣ Monthly Sales Trend with Previous Month Comparison (CTE + Window Function)
 ```sql
-       WITH monthly_trend AS (
-    SELECT EXTRACT(YEAR FROM o.order_data) AS year,
-           EXTRACT(MONTH FROM o.order_data) AS month,
-           ROUND(SUM(oi.total_sales)::NUMERIC, 2) AS total_sales,
-           LAG(SUM(oi.total_sales)) OVER(
-               ORDER BY EXTRACT(YEAR FROM o.order_data), EXTRACT(MONTH FROM o.order_data)
-           ) AS previous_month
+ WITH monthly_trend AS (
+SELECT EXTRACT(YEAR FROM o.order_data) AS year,
+EXTRACT(MONTH FROM o.order_data) AS month,
+ROUND(SUM(oi.total_sales)::NUMERIC, 2) AS total_sales,
+LAG(SUM(oi.total_sales)) OVER(
+ORDER BY EXTRACT(YEAR FROM o.order_data), EXTRACT(MONTH FROM o.order_data)
+) AS previous_month
     FROM orders AS o
     JOIN order_items AS oi
       ON oi.order_id = o.order_id
@@ -111,11 +114,11 @@ FROM monthly_trend;
 
 ### 4️⃣ Customer Lifetime Value (CLTV) (Ranking + Aggregation)
 ```sql
-       SELECT cus.customer_id,
-       CONCAT(cus.first_name, ' ', cus.last_name) AS full_name,
-       SUM(quantity) AS total_quantity,
-       SUM(total_sales) AS total_spent,
-       DENSE_RANK() OVER(ORDER BY SUM(total_sales) DESC) AS rank_by_value
+SELECT cus.customer_id,
+CONCAT(cus.first_name, ' ', cus.last_name) AS full_name,
+SUM(quantity) AS total_quantity,
+SUM(total_sales) AS total_spent,
+DENSE_RANK() OVER(ORDER BY SUM(total_sales) DESC) AS rank_by_value
 FROM orders AS o
 JOIN customers AS cus
   ON cus.customer_id = o.customer_id
@@ -123,6 +126,52 @@ JOIN order_items AS oi
   ON oi.order_id = o.order_id
 GROUP BY 1, 2
 ORDER BY total_spent DESC;
+
+```
+5️⃣ Inventory Update Procedure (PL/pgSQL Stored Procedure)
+```sql
+CREATE OR REPLACE PROCEDURE update_inventory_after_sale(
+    p_order_id INT,
+    p_customer_id INT,
+    p_seller_id INT,
+    p_order_item_id INT,
+    p_product_id INT,
+    p_quantity INT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_price FLOAT;
+    v_count INT;
+BEGIN
+    SELECT price_per_unit
+    INTO v_price
+    FROM products
+    WHERE product_id = p_product_id;
+
+    SELECT COUNT(*)
+    INTO v_count
+    FROM inventory
+    WHERE product_id = p_product_id
+      AND stock >= p_quantity;
+
+    IF v_count > 0 THEN
+        INSERT INTO orders(order_id, order_data, customer_id, seller_id)
+        VALUES (p_order_id, CURRENT_DATE, p_customer_id, p_seller_id);
+
+        INSERT INTO order_items(order_item_id, order_id, product_id, quantity, price_per_unit, total_sales)
+        VALUES (p_order_item_id, p_order_id, p_product_id, p_quantity, v_price, p_quantity * v_price);
+
+        UPDATE inventory
+        SET stock = stock - p_quantity
+        WHERE product_id = p_product_id;
+
+        RAISE NOTICE 'Thank you for purchasing';
+    ELSE
+        RAISE NOTICE 'Product is not available';
+    END IF;
+END;
+$$;
 
 ```
 
