@@ -56,6 +56,23 @@ The following queries were implemented:
 - Highlighted customer retention and repeat purchase patterns.
 - Developed a stored procedure to manage inventory in real-time.
 
+## 💡 Sample Queries
+
+### 1️⃣ Top Selling Products
+```sql
+SELECT p.product_name,
+       ot.product_id,
+       SUM(ot.quantity) AS total_quantity,
+       SUM(ot.total_sales) AS total_sales,
+       COUNT(ot.order_id) AS total_orders
+FROM products AS p
+JOIN order_items AS ot
+  ON p.product_id = ot.product_id
+GROUP BY 1, 2
+ORDER BY total_quantity DESC
+LIMIT 10;
+```
+
 ## 🚀 How to Use
 1. Import the dataset into your **PostgreSQL** database.
 2. Run the provided SQL queries in sequence.
