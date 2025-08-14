@@ -72,6 +72,59 @@ GROUP BY 1, 2
 ORDER BY total_quantity DESC
 LIMIT 10;
 ```
+### 2️⃣ Revenue by Category with % Contribution (Aggregation + Subquery)
+```sql
+       SELECT cat.category_id,
+       cat.category_name,
+       SUM(ot.total_sales) AS total_sales,
+       ROUND(SUM(ot.total_sales)::NUMERIC /
+            (SELECT SUM(total_sales) FROM order_items)::NUMERIC * 100, 2) AS per_contribution
+FROM category AS cat
+JOIN products AS p
+  ON p.category_id = cat.category_id
+JOIN order_items AS ot
+  ON ot.product_id = p.product_id
+GROUP BY 1, 2
+ORDER BY per_contribution DESC;
+
+```
+### 3️⃣ Monthly Sales Trend with Previous Month Comparison (CTE + Window Function)
+```sql
+       WITH monthly_trend AS (
+    SELECT EXTRACT(YEAR FROM o.order_data) AS year,
+           EXTRACT(MONTH FROM o.order_data) AS month,
+           ROUND(SUM(oi.total_sales)::NUMERIC, 2) AS total_sales,
+           LAG(SUM(oi.total_sales)) OVER(
+               ORDER BY EXTRACT(YEAR FROM o.order_data), EXTRACT(MONTH FROM o.order_data)
+           ) AS previous_month
+    FROM orders AS o
+    JOIN order_items AS oi
+      ON oi.order_id = o.order_id
+    WHERE o.order_data >= CURRENT_DATE - INTERVAL '2 year'
+    GROUP BY 1, 2
+)
+SELECT *,
+       (total_sales - previous_month) / previous_month AS value_diff
+FROM monthly_trend;
+
+```
+
+### 4️⃣ Customer Lifetime Value (CLTV) (Ranking + Aggregation)
+```sql
+       SELECT cus.customer_id,
+       CONCAT(cus.first_name, ' ', cus.last_name) AS full_name,
+       SUM(quantity) AS total_quantity,
+       SUM(total_sales) AS total_spent,
+       DENSE_RANK() OVER(ORDER BY SUM(total_sales) DESC) AS rank_by_value
+FROM orders AS o
+JOIN customers AS cus
+  ON cus.customer_id = o.customer_id
+JOIN order_items AS oi
+  ON oi.order_id = o.order_id
+GROUP BY 1, 2
+ORDER BY total_spent DESC;
+
+```
 
 ## 🚀 How to Use
 1. Import the dataset into your **PostgreSQL** database.
